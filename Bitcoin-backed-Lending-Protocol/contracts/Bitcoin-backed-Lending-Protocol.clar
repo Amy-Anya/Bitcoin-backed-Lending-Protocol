@@ -530,3 +530,52 @@
         (ok true)
     )
 )
+
+;; Risk assessment score for a position
+(define-read-only (get-position-risk-score (user principal) (position-id uint))
+    (let (
+        (position (default-to {
+                collateral-asset: "",
+                collateral-amount: u0,
+                borrow-asset: "",
+                borrow-amount: u0,
+                interest-index: u0,
+                timestamp: u0
+            } (map-get? loan-positions { owner: user, position-id: position-id })))
+        (collateral-ratio (get-collateral-ratio position))
+        (liquidation-threshold (get liquidation-threshold 
+                              (default-to {
+                                collateral-factor: u750,
+                                liquidation-threshold: LIQUIDATION-THRESHOLD,
+                                liquidation-penalty: LIQUIDATION-PENALTY,
+                                borrow-enabled: true,
+                                deposit-enabled: true
+                              } (map-get? asset-params (get collateral-asset position)))))
+        ;; Distance to liquidation - higher is safer
+        (safety-margin (- collateral-ratio liquidation-threshold))
+    )
+        ;; Convert to risk score (0-100, lower is safer)
+        (if (>= safety-margin u100) 
+            u0 ;; Very safe
+            (if (<= safety-margin u0)
+                u100 ;; Extremely risky or already liquidatable
+                (- u100 safety-margin))) ;; Linear risk score based on safety margin
+    )
+)
+
+;; Multi-collateral position data structure
+(define-map multi-collateral-positions 
+    { owner: principal, position-id: uint }
+    {
+        collaterals: (list 10 { 
+            asset: (string-ascii 10), 
+            amount: uint 
+        }),
+        borrows: (list 10 { 
+            asset: (string-ascii 10), 
+            amount: uint, 
+            interest-index: uint 
+        }),
+        timestamp: uint
+    }
+)
