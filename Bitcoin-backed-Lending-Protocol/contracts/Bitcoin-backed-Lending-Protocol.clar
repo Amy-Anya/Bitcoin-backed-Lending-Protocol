@@ -472,4 +472,61 @@
     liquidations-paused: bool
 })
 
+;; Reserve factors - percentage of interest that goes to protocol reserves
+(define-map reserve-factor (string-ascii 10) uint) ;; Basis points
 
+;; Protocol reserves
+(define-map protocol-reserves (string-ascii 10) uint)
+
+;; Circuit breaker thresholds
+(define-map circuit-breakers (string-ascii 10) {
+    price-decrease-threshold: uint, ;; Basis points
+    price-increase-threshold: uint, ;; Basis points
+    borrow-increase-threshold: uint, ;; Basis points
+    deposit-decrease-threshold: uint ;; Basis points
+})
+
+;; Price history for volatility tracking
+(define-map price-history 
+    { asset: (string-ascii 10), timestamp: uint } 
+    uint
+)
+
+;; Pause/unpause protocol globally
+(define-public (set-global-pause (paused bool))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-NOT-AUTHORIZED)
+        (var-set global-pause paused)
+        (ok paused)
+    )
+)
+
+;; Set reserve factor for an asset
+(define-public (set-reserve-factor (asset-symbol (string-ascii 10)) (factor uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-NOT-AUTHORIZED)
+        (asserts! (<= factor u5000) ERR-INVALID-AMOUNT) ;; Max 50%
+        (map-set reserve-factor asset-symbol factor)
+        (ok factor)
+    )
+)
+
+;; Set circuit breaker thresholds
+(define-public (set-circuit-breakers 
+    (asset-symbol (string-ascii 10))
+    (price-decrease-threshold uint)
+    (price-increase-threshold uint)
+    (borrow-increase-threshold uint)
+    (deposit-decrease-threshold uint)
+)
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-NOT-AUTHORIZED)
+        (map-set circuit-breakers asset-symbol {
+            price-decrease-threshold: price-decrease-threshold,
+            price-increase-threshold: price-increase-threshold,
+            borrow-increase-threshold: borrow-increase-threshold,
+            deposit-decrease-threshold: deposit-decrease-threshold
+        })
+        (ok true)
+    )
+)
